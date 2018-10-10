@@ -33,9 +33,9 @@ const reducer = (state, action) => {
 }
 
 export const actions = {
-  mapInfos: (infos) => store.dispatch({ type: 'MAP_INFOS', infos }),
   tileSetInfos: (infos) => store.dispatch({ type: 'TILES_INFOS', infos }),
-  loadImg: (img) => store.dispatch({ type: 'LOAD_IMG', img})
+  mapInfos: (infos) => store.dispatch({ type: 'MAP_INFOS', infos }),
+  loadImg: (img) => store.dispatch({ type: 'LOAD_IMG', img}),
 }
 
 export const store = createStore(reducer, initialState)

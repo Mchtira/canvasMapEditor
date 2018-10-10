@@ -18,8 +18,8 @@ class TileSet extends Component {
     actions.tileSetInfos({ canvas, tilectx, tileHeight, tileWidth, tileSquareSide, tileSize })
 
     document.getElementById('tileset').addEventListener('click', evt => {
-      let mouseX = evt.layerX
-      let mouseY = evt.layerY
+      let mouseX = evt.offsetX
+      let mouseY = evt.offsetY
       if (mouseX > tileWidth) mouseX = tileWidth - 1
       if (mouseY > tileHeight) mouseY = tileHeight - 1
       if (mouseX < 0) mouseX = 1
@@ -64,7 +64,7 @@ class TileSet extends Component {
   }
 
   drawImage = () => {
-    const { tilectx } = store.getState().tileSet
+    const { tilectx, tileHeight, tileSize } = store.getState().tileSet
     const image = document.getElementById('img')
     actions.loadImg(image)
     tilectx.drawImage(image, 0, 0)
@@ -74,14 +74,16 @@ class TileSet extends Component {
 
   render() {
     return (
+    <div>
       <div className="tileset">
           <img style={{position: 'absolute', top: '0px', left: '0px', zIndex: 0}}
                id='img'
                src={dungeon}/>
-          <canvas style={{position: 'absolute', top: '0px', left: '0px', zIndex: 1}}
+          <canvas style={{position: 'absolute', top: '0', left: '0px', zIndex: 1}}
                   id="tileset"/>
-          <ShowMap />
       </div>
+      <ShowMap />
+    </div>
     );
   }
 }
