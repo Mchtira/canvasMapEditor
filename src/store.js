@@ -3,14 +3,16 @@ import {createStore} from 'redux'
 const initialState = {
   map: {},
   tileSet: {},
-  image: ''
+  image: '',
 }
 
 const reducer = (state, action) => {
   if (action.type === 'MAP_INFOS') {
+    const map = state.map
     return {
       ...state,
       map: {
+        ...map,
         ...action.infos
       }
     }

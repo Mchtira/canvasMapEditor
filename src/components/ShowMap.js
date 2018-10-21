@@ -1,34 +1,114 @@
-import React, { Component } from 'react';
+import React, { Component } from 'react'
 import { actions, store } from '../store.js'
 
 
 class ShowMap extends Component {
   componentDidMount () {
-    const getIndex = (x, y) => {
-      y = Math.floor(y / squareSide) * squareSide
-      return Math.floor(x / squareSide) + (mapSize * y / squareSide)
+    const getMapIndexFromXY = (x, y) => {
+      y = Math.floor(y / mapTileSize) * mapTileSize
+      return Math.floor(x / mapTileSize) + (mapTilesByRow * y / mapTileSize)
     }
 
-    const getElementFromIndex = (index) => {
+    const getTileIndexFromXY = (x, y) => {
+      const { tileWidth, tilesByRow } = store.getState().tileSet
+      console.log(y, Math.floor(y / tileWidth) * tileWidth)
+      y = Math.floor(y / tileWidth) * tileWidth
+      return Math.floor(x / tileWidth) + (tileWidth * y / tileWidth)
+    }
+
+    const getMapXYFromIndex = (index) => {
       return {
-        posX: index % mapSize * mapSize,
-        posY: Math.floor(index / mapSize) * mapSize
+        x: index % mapTilesByRow * mapTilesByRow,
+        y: Math.floor(index / mapTilesByRow) * mapTilesByRow
       }
     }
 
-    const canvas = document.getElementById("map")
+    const getTileXYFromIndex = (index) => {
+      const { tileWidth, tileHeight, tilesByRow, tilesByColumn } = store.getState().tileSet
+      console.log(
+        'index :', index,
+        'x :', index % 28 * 16,
+        'y :', Math.floor(index / 28) * 16
+      )
+      return {
+        x: index % tilesByRow * tileWidth,
+        y: Math.floor(index / tilesByRow) * tileHeight
+      }
+    }
+
+    const drawGridOnMap = () => {
+      const { mapctx, mapTilesByRow, mapTileSize, mapHeight, mapWidth } = store.getState().map
+      let i = 1
+      mapctx.beginPath()
+      mapctx.fillStyle = "rgb(0,0,0)"
+
+      while (i < mapTilesByRow) {
+        mapctx.fillRect(i * mapTileSize, 0, 1, mapHeight)
+        mapctx.fillRect(0, i * mapTileSize, mapWidth, 1)
+        i++
+      }
+
+      mapctx.closePath()
+    }
+
+    const getMapIndexsFromXY = (startSelection, endSelection) => {
+      let widthIndex = getMapIndexFromXY(startSelection.x, startSelection.y)
+      let widthEndIndex = getMapIndexFromXY(endSelection.x, startSelection.y)
+      let heightIndex = getMapIndexFromXY(startSelection.x, endSelection.y)
+      let heightEndIndex = getMapIndexFromXY(endSelection.x, endSelection.y)
+      let tmp = 0
+      const selection = []
+
+      if (widthIndex > widthEndIndex) {
+        tmp = widthEndIndex
+        widthEndIndex = widthIndex
+        widthIndex = tmp
+      }
+
+      if (heightIndex > heightEndIndex) {
+        tmp = heightEndIndex
+        heightEndIndex = heightIndex
+        heightIndex = tmp
+      }
+
+      if (widthIndex > heightIndex) {
+        tmp = heightIndex
+        heightIndex = widthIndex
+        widthIndex = tmp
+        tmp = heightEndIndex
+        heightEndIndex = widthEndIndex
+        widthEndIndex = tmp
+      }
+
+      const row = (heightIndex - widthIndex) / mapTilesByRow
+
+      while (widthIndex <= widthEndIndex) {
+        selection.push(widthIndex)
+        for (let i = 1; i <= row; i++) {
+          selection.push(widthIndex + (mapTilesByRow * i))
+        }
+        widthIndex++
+      }
+
+      return selection
+    }
+
+    const canvas = document.getElementById('map')
     const mapctx = canvas.getContext('2d')
-    const mapSize = 30
-    const mapHeight = mapSize * 12
-    const mapWidth = mapSize * mapSize
-    const squareSide = mapWidth / mapSize
+    const mapTilesByRow = 16
+    const mapTilesByColumn = 16
+    const mapHeight = mapTilesByRow * mapTilesByRow
+    const mapWidth = mapTilesByRow * mapTilesByRow
+    const mapTileSize = mapWidth / mapTilesByRow
+    const mapArray = []
     let startSelection = {}
     let endSelection = {}
 
     canvas.width = mapWidth
     canvas.height = mapHeight
+    mapArray.length = mapWidth / mapTilesByRow * mapHeight / mapTilesByRow
 
-    actions.mapInfos({canvas, mapctx, mapHeight, mapWidth, squareSide, mapSize })
+    actions.mapInfos({ mapctx, mapHeight, mapWidth, mapTileSize, mapTilesByRow, mapArray })
 
     document.getElementById('map').addEventListener('mousedown', e => {
       let mouseX = e.offsetX
@@ -38,8 +118,9 @@ class ShowMap extends Component {
       if (mouseX < 0) mouseX = 1
       if (mouseY < 0) mouseY = 1
 
-      const index = getIndex(mouseX, mouseY)
-      startSelection = getElementFromIndex(index)
+      const mapIndex = getMapIndexFromXY(mouseX, mouseY)
+      startSelection = getMapXYFromIndex(mapIndex)
+      endSelection = {}
     })
 
     document.getElementById('map').addEventListener('mouseup', e => {
@@ -50,91 +131,36 @@ class ShowMap extends Component {
       if (mouseX < 0) mouseX = 1
       if (mouseY < 0) mouseY = 1
 
-      const index = getIndex(mouseX, mouseY)
-      endSelection = getElementFromIndex(index)
-      const { selectionPosX, selectionPosY, tileSize } = store.getState().tileSet
+      const mapIndex = getMapIndexFromXY(mouseX, mouseY)
+      endSelection = getMapXYFromIndex(mapIndex)
+      const { tileWidth, tileHeight, tileIndex } = store.getState().tileSet
       const image = store.getState().image
-      let drawThis = []
+      const selectedIndexs = getMapIndexsFromXY(startSelection, endSelection)
 
-      const getIndexs = (startSelection, endSelection) => {
-        let widthIndex = getIndex(startSelection.posX, startSelection.posY)
-        let widthEndIndex = getIndex(endSelection.posX, startSelection.posY)
-        let heightIndex = getIndex(startSelection.posX, endSelection.posY)
-        let heightEndIndex = getIndex(endSelection.posX, endSelection.posY)
-        let tmp = 0
+      selectedIndexs.forEach(index => mapArray[index] = tileIndex)
 
-        if (widthIndex > widthEndIndex) {
-          tmp = widthEndIndex
-          widthEndIndex = widthIndex
-          widthIndex = tmp
-        }
+      mapArray.forEach((tileIndex, mapIndex) => {
+        const tilePos = getTileXYFromIndex(tileIndex)
+        const mapPos = getMapXYFromIndex(mapIndex)
+        mapctx.drawImage(image, tilePos.x, tilePos.y, tileWidth, tileHeight, mapPos.x, mapPos.y, mapTilesByRow, mapTilesByRow)
+      })
 
-        if (heightIndex > heightEndIndex) {
-          tmp = heightEndIndex
-          heightEndIndex = heightIndex
-          heightIndex = tmp
-        }
-
-        if (widthIndex > heightIndex) {
-          tmp = heightIndex
-          heightIndex = widthIndex
-          widthIndex = tmp
-          tmp = heightEndIndex
-          heightEndIndex = widthEndIndex
-          widthEndIndex = tmp
-        }
-
-        const row = (heightIndex - widthIndex) / mapSize
-
-        while (widthIndex <= widthEndIndex) {
-          drawThis.push(widthIndex)
-          for (let i = 1; i <= row; i++) {
-            drawThis.push(widthIndex + (mapSize * i))
-          }
-          widthIndex++
-        }
-
-        drawThis
-          .map(index => getElementFromIndex(index))
-          .forEach(position => {
-            mapctx.drawImage(image, selectionPosX, selectionPosY, tileSize, tileSize,
-                             position.posX, position.posY, mapSize, mapSize)
-          })
-      }
-
-      getIndexs(startSelection, endSelection)
-
-      mapctx.drawImage(image, selectionPosX, selectionPosY, tileSize, tileSize,
-                       startSelection.posX, startSelection.posY, mapSize, mapSize)
-      this.drawGrid()
+      drawGridOnMap()
+      startSelection = {}
+      endSelection = {}
+      actions.mapInfos({ mapArray })
     })
-    this.drawGrid()
-  }
 
-  drawGrid = () => {
-    const { mapctx, mapSize, squareSide, mapHeight, mapWidth } = store.getState().map
-    let i = 1
-    mapctx.beginPath()
-    mapctx.fillStyle = "rgb(0,0,0)"
-
-    while (i < mapSize) {
-      mapctx.fillRect(i * squareSide, Math.floor(i / mapSize) * squareSide,
-                   1, mapHeight)
-      mapctx.fillRect(Math.floor(i / mapSize) * squareSide, i * squareSide,
-                   mapWidth, 1)
-      i++
-    }
-
-    mapctx.closePath()
+    drawGridOnMap()
   }
 
   render() {
     return (
       <div className="ShowMap">
-        <canvas style={{position: 'absolute', top: '275px', left: '0px'}} id='map'/>
+        <canvas id='map' style={{position: 'absolute', left: '500px'}}/>
       </div>
-    );
+    )
   }
 }
 
-export default ShowMap;
+export default ShowMap
