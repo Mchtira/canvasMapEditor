@@ -6,45 +6,68 @@ class ShowMap extends Component {
   componentDidMount () {
     const getMapIndexFromXY = (x, y) => {
       y = Math.floor(y / mapTileSize) * mapTileSize
-      return Math.floor(x / mapTileSize) + (mapTilesByRow * y / mapTileSize)
+      return Math.floor(x / mapTileSize) + (y * mapTilesByRow / mapTileSize)
     }
 
     const getTileIndexFromXY = (x, y) => {
       const { tileWidth, tilesByRow } = store.getState().tileSet
-      console.log(y, Math.floor(y / tileWidth) * tileWidth)
       y = Math.floor(y / tileWidth) * tileWidth
       return Math.floor(x / tileWidth) + (tileWidth * y / tileWidth)
     }
 
     const getMapXYFromIndex = (index) => {
       return {
-        x: index % mapTilesByRow * mapTilesByRow,
-        y: Math.floor(index / mapTilesByRow) * mapTilesByRow
+        x: index % mapTilesByRow * mapTileSize,
+        y: Math.floor(index / mapTilesByRow) * mapTileSize
       }
     }
 
     const getTileXYFromIndex = (index) => {
       const { tileWidth, tileHeight, tilesByRow, tilesByColumn } = store.getState().tileSet
-      console.log(
-        'index :', index,
-        'x :', index % 28 * 16,
-        'y :', Math.floor(index / 28) * 16
-      )
       return {
         x: index % tilesByRow * tileWidth,
         y: Math.floor(index / tilesByRow) * tileHeight
       }
     }
 
+    const drawMap = () => {
+      const { mapctx, mapTileSize, mapArray } = store.getState().map
+      const { tileWidth, tileHeight } = store.getState().tileSet
+      const image = store.getState().image
+
+      mapArray.forEach((tileIndex, mapIndex) => {
+        const tilePos = getTileXYFromIndex(tileIndex)
+        const mapPos = getMapXYFromIndex(mapIndex)
+        mapctx.beginPath()
+        mapctx.fillStyle = "rgb(255,255,255)"
+
+        if (tileIndex === -1) {
+          mapctx.fillRect(mapPos.x, mapPos.y, mapTileSize, mapTileSize)
+        } else {
+          mapctx.fillRect(mapPos.x, mapPos.y, mapTileSize, mapTileSize)
+          mapctx.drawImage(image, tilePos.x, tilePos.y, tileWidth, tileHeight, mapPos.x, mapPos.y, mapTileSize, mapTileSize)
+        }
+        mapctx.closePath()
+      })
+    }
+
     const drawGridOnMap = () => {
-      const { mapctx, mapTilesByRow, mapTileSize, mapHeight, mapWidth } = store.getState().map
+      const { mapctx, mapTilesByRow, mapTilesByColumn, mapTileSize, mapHeight, mapWidth } = store.getState().map
       let i = 1
       mapctx.beginPath()
       mapctx.fillStyle = "rgb(0,0,0)"
+      mapctx.fillRect(0 * (mapWidth / mapTilesByRow), 0, 0.5, mapHeight)
+      mapctx.fillRect(0, 0 * (mapHeight / mapTilesByColumn), mapWidth, 1)
 
-      while (i < mapTilesByRow) {
-        mapctx.fillRect(i * mapTileSize, 0, 1, mapHeight)
-        mapctx.fillRect(0, i * mapTileSize, mapWidth, 1)
+      while (i <= mapTilesByRow) {
+        mapctx.fillRect(i * (mapWidth / mapTilesByRow) - 0.5, 0, 0.5, mapHeight)
+        i++
+      }
+
+      i = 1
+
+      while (i <= mapTilesByColumn) {
+        mapctx.fillRect(0, i * (mapHeight / mapTilesByColumn) - 0.5, mapWidth, 0.5)
         i++
       }
 
@@ -56,8 +79,8 @@ class ShowMap extends Component {
       let widthEndIndex = getMapIndexFromXY(endSelection.x, startSelection.y)
       let heightIndex = getMapIndexFromXY(startSelection.x, endSelection.y)
       let heightEndIndex = getMapIndexFromXY(endSelection.x, endSelection.y)
-      let tmp = 0
       const selection = []
+      let tmp = 0
 
       if (widthIndex > widthEndIndex) {
         tmp = widthEndIndex
@@ -95,26 +118,27 @@ class ShowMap extends Component {
 
     const canvas = document.getElementById('map')
     const mapctx = canvas.getContext('2d')
-    const mapTilesByRow = 16
-    const mapTilesByColumn = 16
-    const mapHeight = mapTilesByRow * mapTilesByRow
-    const mapWidth = mapTilesByRow * mapTilesByRow
-    const mapTileSize = mapWidth / mapTilesByRow
+    const mapTileSize = 16
+    const mapTilesByRow = 20
+    const mapTilesByColumn = 20
+    const mapWidth = mapTilesByRow * mapTileSize
+    const mapHeight = mapTilesByColumn * mapTileSize
     const mapArray = []
     let startSelection = {}
     let endSelection = {}
 
     canvas.width = mapWidth
     canvas.height = mapHeight
-    mapArray.length = mapWidth / mapTilesByRow * mapHeight / mapTilesByRow
+    mapArray.length = mapTilesByRow * mapTilesByColumn
+    mapArray.fill(-1)
 
-    actions.mapInfos({ mapctx, mapHeight, mapWidth, mapTileSize, mapTilesByRow, mapArray })
+    actions.mapInfos({ mapctx, mapHeight, mapWidth, mapTileSize, mapTilesByRow, mapTilesByColumn, mapArray })
 
     document.getElementById('map').addEventListener('mousedown', e => {
       let mouseX = e.offsetX
       let mouseY = e.offsetY
-      if (mouseX > mapWidth) mouseX = mapWidth - 1
-      if (mouseY > mapHeight) mouseY = mapHeight - 1
+      if (mouseX >= mapWidth) mouseX = mapWidth - 1
+      if (mouseY >= mapHeight) mouseY = mapHeight - 1
       if (mouseX < 0) mouseX = 1
       if (mouseY < 0) mouseY = 1
 
@@ -140,9 +164,15 @@ class ShowMap extends Component {
       selectedIndexs.forEach(index => mapArray[index] = tileIndex)
 
       mapArray.forEach((tileIndex, mapIndex) => {
-        const tilePos = getTileXYFromIndex(tileIndex)
-        const mapPos = getMapXYFromIndex(mapIndex)
-        mapctx.drawImage(image, tilePos.x, tilePos.y, tileWidth, tileHeight, mapPos.x, mapPos.y, mapTilesByRow, mapTilesByRow)
+          const tilePos = getTileXYFromIndex(tileIndex)
+          const mapPos = getMapXYFromIndex(mapIndex)
+          mapctx.fillStyle = "rgb(255,255,255)"
+        if (tileIndex === -1) {
+          mapctx.fillRect(mapPos.x, mapPos.y, mapTileSize, mapTileSize)
+        } else {
+          mapctx.fillRect(mapPos.x, mapPos.y, mapTileSize, mapTileSize)
+          mapctx.drawImage(image, tilePos.x, tilePos.y, tileWidth, tileHeight, mapPos.x, mapPos.y, mapTileSize, mapTileSize)
+        }
       })
 
       drawGridOnMap()
@@ -150,14 +180,14 @@ class ShowMap extends Component {
       endSelection = {}
       actions.mapInfos({ mapArray })
     })
-
+    drawMap()
     drawGridOnMap()
   }
 
   render() {
     return (
-      <div className="ShowMap">
-        <canvas id='map' style={{position: 'absolute', left: '500px'}}/>
+      <div className="ShowMap" style={{ padding: '1%'}}>
+        <canvas id='map'/>
       </div>
     )
   }

@@ -14,7 +14,7 @@ class App extends Component {
 
   render() {
     return (
-      <div className="App">
+      <div className="App" style={{display: 'flex', flexDirection:'row',}}>
         <TileSet {...this.state}/>
         <ShowMap {...this.state}/>
       </div>
